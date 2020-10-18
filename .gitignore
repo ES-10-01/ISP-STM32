@@ -1,0 +1,12 @@
+Debug
+Drivers
+'govno Debug.launch'
+Middlewares
+STM32L152RCTX_FLASH.ld
+TOUCHSENSING
+.cproject
+.mxproject
+.project
+.settings/
+*.swp
+
