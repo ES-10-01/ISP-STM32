@@ -59,6 +59,29 @@ static void MX_USART1_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+char read_keypad()
+{
+  HAL_GPIO_WritePin(GPIOB, pin_row_Pin, GPIO_PIN_SET);
+
+  if ((HAL_GPIO_ReadPin(GPIOB, pin_1_Pin))) {
+    while ((HAL_GPIO_ReadPin(GPIOB, pin_1_Pin)));
+    return '1';
+  }
+
+  if ((HAL_GPIO_ReadPin(GPIOB, pin_4_Pin))) {
+    while ((HAL_GPIO_ReadPin(GPIOB, pin_4_Pin)));
+    return '4';
+  }
+  if ((HAL_GPIO_ReadPin(GPIOB, pin_2_Pin))) {
+    while ((HAL_GPIO_ReadPin(GPIOB, pin_2_Pin)));
+    return '2';
+  }
+  if ((HAL_GPIO_ReadPin(GPIOB, pin_3_Pin))) {
+    while ((HAL_GPIO_ReadPin(GPIOB, pin_3_Pin)));
+    return '3';
+  }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -98,6 +121,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  char a = read_keypad();
 	  if (check_esp_available(NULL, &huart1) != 0) {
 		  return 2;
 	  }
