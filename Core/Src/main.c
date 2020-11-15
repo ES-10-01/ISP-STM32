@@ -122,6 +122,16 @@ int main(void)
   while (1)
   {
 	  char a = read_keypad();
+	  if (a=='2') {
+		  HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_SET);
+		  HAL_Delay(500);
+		  HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_RESET);
+	  }
+	  else if (a=='4') {
+		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
+		  HAL_Delay(500);
+		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
+	  }
 	  if (check_esp_available(NULL, &huart1) != 0) {
 		  return 2;
 	  }
@@ -218,11 +228,17 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(pin_row_GPIO_Port, pin_row_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, pin_row_Pin|blue_led_Pin|green_led_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : pin_2_Pin pin_1_Pin pin_4_Pin pin_3_Pin */
+  GPIO_InitStruct.Pin = pin_2_Pin|pin_1_Pin|pin_4_Pin|pin_3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : pin_row_Pin */
   GPIO_InitStruct.Pin = pin_row_Pin;
@@ -231,10 +247,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(pin_row_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : pin_3_Pin pin_4_Pin pin_1_Pin pin_2_Pin */
-  GPIO_InitStruct.Pin = pin_3_Pin|pin_4_Pin|pin_1_Pin|pin_2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  /*Configure GPIO pins : blue_led_Pin green_led_Pin */
+  GPIO_InitStruct.Pin = blue_led_Pin|green_led_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
