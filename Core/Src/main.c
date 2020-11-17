@@ -25,6 +25,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "wifi.h"
+#include "task.h"
+#include <string.h>
 //#include "UartRingbuffer_multi.h"
 /* USER CODE END Includes */
 
@@ -59,10 +61,10 @@ const osThreadAttr_t init_task_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
-/* Definitions for close_state */
-osThreadId_t close_stateHandle;
-const osThreadAttr_t close_state_attributes = {
-  .name = "close_state",
+/* Definitions for close_state_tas */
+osThreadId_t close_state_tasHandle;
+const osThreadAttr_t close_state_tas_attributes = {
+  .name = "close_state_tas",
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
@@ -70,21 +72,21 @@ const osThreadAttr_t close_state_attributes = {
 osThreadId_t input_taskHandle;
 const osThreadAttr_t input_task_attributes = {
   .name = "input_task",
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
 /* Definitions for wait_answer_tas */
 osThreadId_t wait_answer_tasHandle;
 const osThreadAttr_t wait_answer_tas_attributes = {
   .name = "wait_answer_tas",
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
 /* Definitions for open_task */
 osThreadId_t open_taskHandle;
 const osThreadAttr_t open_task_attributes = {
   .name = "open_task",
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
 /* USER CODE BEGIN PV */
@@ -97,7 +99,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void *argument);
 void InitTask(void *argument);
-void CloseState(void *argument);
+void CloseStateTask(void *argument);
 void InputTask(void *argument);
 void WaitAnswerTask(void *argument);
 void OpenTask(void *argument);
@@ -193,8 +195,8 @@ int main(void)
   /* creation of init_task */
   init_taskHandle = osThreadNew(InitTask, NULL, &init_task_attributes);
 
-  /* creation of close_state */
-  close_stateHandle = osThreadNew(CloseState, NULL, &close_state_attributes);
+  /* creation of close_state_tas */
+  close_state_tasHandle = osThreadNew(CloseStateTask, NULL, &close_state_tas_attributes);
 
   /* creation of input_task */
   input_taskHandle = osThreadNew(InputTask, NULL, &input_task_attributes);
@@ -370,32 +372,59 @@ void StartDefaultTask(void *argument)
 void InitTask(void *argument)
 {
   /* USER CODE BEGIN InitTask */
+	char answer[9];
+ // TODO подключчение к точке доступа
+ // получение ip
+ // установка tcp соединения
+ // отправка сообщения GOS_HELLO
+	xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
+
   /* Infinite loop */
   for(;;)
   {
-	  if (check_esp_available(NULL, &huart1) != 0) {
+	  // ожидание сообщения от сервера
+	  // answer = getesp_answer():
+	  if (strncmp(answer, "GOS_CLOSE", 9) == 0){
+		 xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
+		 memset(answer,0,sizeof(answer));
+	  }
+	  else if (strncmp(answer, "GOS_GET", 7) == 0) {
+		 xTaskNotify(input_taskHandle, (1<<0), eSetValueWithOverwrite);
+		 memset(answer,0,sizeof(answer));
+	  }
+	  else if (strncmp(answer, "GOS_OPEN", 8) == 0){
+		 xTaskNotify(open_taskHandle, (1<<0), eSetValueWithOverwrite);
+		 memset(answer,0,sizeof(answer));
+	  }
+
+/*	  if (check_esp_available(NULL, &huart1) != 0) {
 	 		  return 2;
-	 	  }
+	 	  }*/
   }
   /* USER CODE END InitTask */
 }
 
-/* USER CODE BEGIN Header_CloseState */
+/* USER CODE BEGIN Header_CloseStateTask */
 /**
-* @brief Function implementing the close_state thread.
+* @brief Function implementing the close_state_tas thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_CloseState */
-void CloseState(void *argument)
+/* USER CODE END Header_CloseStateTask */
+void CloseStateTask(void *argument)
 {
-  /* USER CODE BEGIN CloseState */
+  /* USER CODE BEGIN CloseStateTask */
+  uint32_t ulNotifiedValue;
   /* Infinite loop */
   for(;;)
   {
+	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
+		//pfnthtnm экран и вывести на экран close
+	}
+
     osDelay(1);
   }
-  /* USER CODE END CloseState */
+  /* USER CODE END CloseStateTask */
 }
 
 /* USER CODE BEGIN Header_InputTask */
@@ -408,12 +437,30 @@ void CloseState(void *argument)
 void InputTask(void *argument)
 {
   /* USER CODE BEGIN InputTask */
+  int i = 0;
+  char pin[4];
+  uint32_t ulNotifiedValue;
   /* Infinite loop */
   for(;;)
   {
-	  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
-	  char a = read_keypad();
-	  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
+	  if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
+		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
+		  //вывести на экран PIN:
+		  while (i < 4){
+		  char a = read_keypad();								//заменить на ожидание 4 цифр
+		  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
+			 pin[i] = a;
+			 a = '0';
+			 //введеную цифру на экран
+			 i++;
+		  }
+		  }
+		  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
+		  //по таймауту 30 секунд
+		  //отправить GOS_PASS=pin
+		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
+	  }
+
 
   }
   /* USER CODE END InputTask */
@@ -429,9 +476,13 @@ void InputTask(void *argument)
 void WaitAnswerTask(void *argument)
 {
   /* USER CODE BEGIN WaitAnswerTask */
+  uint32_t ulNotifiedValue;
   /* Infinite loop */
   for(;;)
   {
+	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
+		//переход в зыкрытое состония по таймауту
+	}
     osDelay(1);
   }
   /* USER CODE END WaitAnswerTask */
@@ -447,10 +498,18 @@ void WaitAnswerTask(void *argument)
 void OpenTask(void *argument)
 {
   /* USER CODE BEGIN OpenTask */
+  uint32_t ulNotifiedValue;
   /* Infinite loop */
   for(;;)
   {
-	  HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_SET);
+	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
+		//затаереть экран и вывести OPEN
+		HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_SET);
+		//timeout 10 секунд
+		osDelay(10000);
+		HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_RESET);
+		xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
+	}
   }
   /* USER CODE END OpenTask */
 }

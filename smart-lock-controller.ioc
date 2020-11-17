@@ -1,8 +1,8 @@
 #MicroXplorer Configuration settings - do not modify
-FREERTOS.FootprintOK=true
+FREERTOS.FootprintOK=false
 FREERTOS.IPParameters=Tasks01,FootprintOK,configTOTAL_HEAP_SIZE
-FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;init_task,24,128,InitTask,Default,NULL,Dynamic,NULL,NULL;close_state,24,128,CloseState,Default,NULL,Dynamic,NULL,NULL;input_task,16,128,InputTask,Default,NULL,Dynamic,NULL,NULL;wait_answer_tas,16,128,WaitAnswerTask,Default,NULL,Dynamic,NULL,NULL;open_task,16,128,OpenTask,Default,NULL,Dynamic,NULL,NULL
-FREERTOS.configTOTAL_HEAP_SIZE=25600
+FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;init_task,24,128,InitTask,Default,NULL,Dynamic,NULL,NULL;close_state_tas,24,128,CloseStateTask,Default,NULL,Dynamic,NULL,NULL;input_task,24,128,InputTask,Default,NULL,Dynamic,NULL,NULL;wait_answer_tas,24,128,WaitAnswerTask,Default,NULL,Dynamic,NULL,NULL;open_task,24,128,OpenTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.configTOTAL_HEAP_SIZE=20000
 File.Version=6
 GPIO.groupedBy=Group By Peripherals
 KeepUserPlacement=false
@@ -94,7 +94,7 @@ PH0-OSC_IN.Signal=RCC_OSC_IN
 PH1-OSC_OUT.Mode=HSE-External-Oscillator
 PH1-OSC_OUT.Signal=RCC_OSC_OUT
 PinOutPanel.RotationAngle=0
-ProjectManager.AskForMigrate=false
+ProjectManager.AskForMigrate=true
 ProjectManager.BackupPrevious=false
 ProjectManager.CompilerOptimize=6
 ProjectManager.ComputerToolchain=false
