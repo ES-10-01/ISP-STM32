@@ -75,13 +75,6 @@ const osThreadAttr_t input_task_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
-/* Definitions for wait_answer_tas */
-osThreadId_t wait_answer_tasHandle;
-const osThreadAttr_t wait_answer_tas_attributes = {
-  .name = "wait_answer_tas",
-  .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
-};
 /* Definitions for open_task */
 osThreadId_t open_taskHandle;
 const osThreadAttr_t open_task_attributes = {
@@ -101,7 +94,6 @@ void StartDefaultTask(void *argument);
 void InitTask(void *argument);
 void CloseStateTask(void *argument);
 void InputTask(void *argument);
-void WaitAnswerTask(void *argument);
 void OpenTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -110,6 +102,11 @@ void OpenTask(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+const char network_name[] = "OnePlus";
+const char network_pasw[]="1234321";
+const char serv_ip[]="192.168.0.1";
+const char control_id[]="1";
 
 char read_keypad()
 {
@@ -200,9 +197,6 @@ int main(void)
 
   /* creation of input_task */
   input_taskHandle = osThreadNew(InputTask, NULL, &input_task_attributes);
-
-  /* creation of wait_answer_tas */
-  wait_answer_tasHandle = osThreadNew(WaitAnswerTask, NULL, &wait_answer_tas_attributes);
 
   /* creation of open_task */
   open_taskHandle = osThreadNew(OpenTask, NULL, &open_task_attributes);
@@ -372,34 +366,34 @@ void StartDefaultTask(void *argument)
 void InitTask(void *argument)
 {
   /* USER CODE BEGIN InitTask */
+	enum GosServerCommands serv_answer;
 	char answer[9];
- // TODO подключчение к точке доступа
- // получение ip
- // установка tcp соединения
- // отправка сообщения GOS_HELLO
+	check_esp_available(&huart1);
+	init_esp(&huart1);
+	connect_to_network(&huart1, network_name, network_pasw);
+	connect_to_server(&huart1, serv_ip, 8888);
+	send_hello(&huart1, control_id);
+
 	xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
 
   /* Infinite loop */
   for(;;)
   {
-	  // ожидание сообщения от сервера
-	  // answer = getesp_answer():
-	  if (strncmp(answer, "GOS_CLOSE", 9) == 0){
+	  serv_answer = recieve_command(&huart1);// ожидание сообщения от сервера
+	  if (serv_answer == GOS_CLOSE_CMD){
 		 xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
-		 memset(answer,0,sizeof(answer));
+		 serv_answer = UNKNOWN_CMD;
 	  }
-	  else if (strncmp(answer, "GOS_GET", 7) == 0) {
+	  else if (serv_answer == GOS_GET_CMD) {
 		 xTaskNotify(input_taskHandle, (1<<0), eSetValueWithOverwrite);
-		 memset(answer,0,sizeof(answer));
+		 serv_answer = UNKNOWN_CMD;
 	  }
-	  else if (strncmp(answer, "GOS_OPEN", 8) == 0){
+	  else if (serv_answer == GOS_OPEN_CMD){
 		 xTaskNotify(open_taskHandle, (1<<0), eSetValueWithOverwrite);
-		 memset(answer,0,sizeof(answer));
+		 serv_answer = UNKNOWN_CMD;
 	  }
 
-/*	  if (check_esp_available(NULL, &huart1) != 0) {
-	 		  return 2;
-	 	  }*/
+
   }
   /* USER CODE END InitTask */
 }
@@ -419,7 +413,8 @@ void CloseStateTask(void *argument)
   for(;;)
   {
 	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
-		//pfnthtnm экран и вывести на экран close
+		//очистить экран
+		//Подключить экран и вывести на экран close
 	}
 
     osDelay(1);
@@ -444,10 +439,11 @@ void InputTask(void *argument)
   for(;;)
   {
 	  if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
+		  //очистить экран
 		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
 		  //вывести на экран PIN:
 		  while (i < 4){
-		  char a = read_keypad();								//заменить на ожидание 4 цифр
+		  char a = read_keypad();
 		  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
 			 pin[i] = a;
 			 a = '0';
@@ -457,35 +453,14 @@ void InputTask(void *argument)
 		  }
 		  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
 		  //по таймауту 30 секунд
-		  //отправить GOS_PASS=pin
+		  send_password(&huart1, pin); //отправить GOS_PASS=pin
+
 		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
 	  }
 
 
   }
   /* USER CODE END InputTask */
-}
-
-/* USER CODE BEGIN Header_WaitAnswerTask */
-/**
-* @brief Function implementing the wait_answer_tas thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_WaitAnswerTask */
-void WaitAnswerTask(void *argument)
-{
-  /* USER CODE BEGIN WaitAnswerTask */
-  uint32_t ulNotifiedValue;
-  /* Infinite loop */
-  for(;;)
-  {
-	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
-		//переход в зыкрытое состония по таймауту
-	}
-    osDelay(1);
-  }
-  /* USER CODE END WaitAnswerTask */
 }
 
 /* USER CODE BEGIN Header_OpenTask */
