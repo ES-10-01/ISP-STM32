@@ -45,6 +45,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim9;
+
 UART_HandleTypeDef huart1;
 
 /* Definitions for defaultTask */
@@ -90,6 +92,7 @@ const osThreadAttr_t open_task_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM9_Init(void);
 void StartDefaultTask(void *argument);
 void InitTask(void *argument);
 void CloseStateTask(void *argument);
@@ -162,6 +165,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -263,6 +267,52 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM9 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM9_Init(void)
+{
+
+  /* USER CODE BEGIN TIM9_Init 0 */
+
+  /* USER CODE END TIM9_Init 0 */
+
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM9_Init 1 */
+
+  /* USER CODE END TIM9_Init 1 */
+  htim9.Instance = TIM9;
+  htim9.Init.Prescaler = 0;
+  htim9.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim9.Init.Period = 30000;
+  htim9.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim9.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim9) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR0;
+  if (HAL_TIM_SlaveConfigSynchro(&htim9, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim9, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM9_Init 2 */
+
+  /* USER CODE END TIM9_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -310,7 +360,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, pin_row_Pin|blue_led_Pin|green_led_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, pin_row_Pin|inter_time_Pin|blue_led_Pin|green_led_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : pin_2_Pin pin_1_Pin pin_4_Pin pin_3_Pin */
   GPIO_InitStruct.Pin = pin_2_Pin|pin_1_Pin|pin_4_Pin|pin_3_Pin;
@@ -325,8 +375,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(pin_row_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : blue_led_Pin green_led_Pin */
-  GPIO_InitStruct.Pin = blue_led_Pin|green_led_Pin;
+  /*Configure GPIO pins : inter_time_Pin blue_led_Pin green_led_Pin */
+  GPIO_InitStruct.Pin = inter_time_Pin|blue_led_Pin|green_led_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -367,7 +417,6 @@ void InitTask(void *argument)
 {
   /* USER CODE BEGIN InitTask */
 	enum GosServerCommands serv_answer;
-	char answer[9];
 	check_esp_available(&huart1);
 	init_esp(&huart1);
 	connect_to_network(&huart1, network_name, network_pasw);
@@ -432,32 +481,38 @@ void CloseStateTask(void *argument)
 void InputTask(void *argument)
 {
   /* USER CODE BEGIN InputTask */
+  uint32_t ulNotifiedValue;
+  if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
+  HAL_TIM_Base_Start(&htim9);
   int i = 0;
   char pin[4];
-  uint32_t ulNotifiedValue;
+  GPIO_PinState wait = GPIO_PIN_RESET;
+
   /* Infinite loop */
-  for(;;)
-  {
-	  if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
-		  //очистить экран
-		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
-		  //вывести на экран PIN:
-		  while (i < 4){
-		  char a = read_keypad();
-		  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
-			 pin[i] = a;
-			 a = '0';
-			 //введеную цифру на экран
-			 i++;
-		  }
-		  }
-		  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
-		  //по таймауту 30 секунд
-		  send_password(&huart1, pin); //отправить GOS_PASS=pin
 
-		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
+	  //очистить экран
+	  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
+	  //вывести на экран PIN:
+	  while (i < 4 && (wait == GPIO_PIN_RESET)){
+	  wait = HAL_GPIO_ReadPin(GPIOB, inter_time_Pin);
+	  char a = read_keypad();
+	  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
+		 pin[i] = a;
+		 a = '0';
+		 //введеную цифру на экран
+		 i++;
 	  }
-
+	  }
+	  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
+	  //по таймауту 30 секунд
+	  if(wait == GPIO_PIN_RESET){
+		  send_password(&huart1, pin); //отправить GOS_PASS=pin
+	  }
+	  HAL_TIM_Base_Stop_IT(&htim9);
+	  __HAL_TIM_SET_COUNTER(&htim9, 0x0000);
+	  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_RESET);
+	  //остановить и сбросить таймер
+	  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
 
   }
   /* USER CODE END InputTask */
