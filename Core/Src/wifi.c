@@ -57,7 +57,7 @@ uint8_t send_at_command(uart_ptr huart, uint8_t * command)
 	return 0;
 }
 
-uint8_t recieve_at_response(uart_ptr huart, uint8_t * buffer)
+uint8_t recieve_at_response(uart_ptr huart, uint8_t * buffer, uint8_t exit_on_timeout)
 {
 	uint8_t tmp_buf = 0;
 	uint8_t recieve_started = 0;
@@ -66,7 +66,8 @@ uint8_t recieve_at_response(uart_ptr huart, uint8_t * buffer)
 	while (tmp_buf != 0 || !recieve_started) {
 		tmp_buf = 0;
 		recieve_started = 1;
-		if (HAL_UART_Receive(huart, &tmp_buf, 1, 5) == HAL_ERROR) {
+		HAL_StatusTypeDef rc = HAL_UART_Receive(huart, &tmp_buf, 1, 5);
+		if (rc == HAL_ERROR || (rc == HAL_TIMEOUT && exit_on_timeout)) {
 			return -1;
 		}
 
@@ -92,7 +93,7 @@ uint8_t send_at_and_check_response(uart_ptr huart, uint8_t * command)
 		return -1;
 	}
 
-	if (RC_FAIL(recieve_at_response(huart, recieve_buffer))) {
+	if (RC_FAIL(recieve_at_response(huart, recieve_buffer, 0))) {
 		return -1;
 	}
 
@@ -168,7 +169,7 @@ uint8_t send_message(uart_ptr huart, const char * message)
 		return -1;
 	}
 
-	if (RC_FAIL(recieve_at_response(huart, recieve_buffer))) {
+	if (RC_FAIL(recieve_at_response(huart, recieve_buffer, 0))) {
 		return -1;
 	}
 
@@ -182,7 +183,7 @@ uint8_t send_message(uart_ptr huart, const char * message)
 
 	memset(recieve_buffer, 0, sizeof(recieve_buffer));
 
-	if (RC_FAIL(recieve_at_response(huart, recieve_buffer))) {
+	if (RC_FAIL(recieve_at_response(huart, recieve_buffer, 0))) {
 		return -1;
 	}
 
@@ -202,7 +203,7 @@ int8_t send_hello(uart_ptr huart, const char * id)
 		return -1;
 	}
 
-	if (RC_FAIL(recieve_at_response(huart, recieve_buffer))) {
+	if (RC_FAIL(recieve_at_response(huart, recieve_buffer, 0))) {
 		return -1;
 	}
 
@@ -241,8 +242,8 @@ enum GosServerCommands recieve_command(uart_ptr huart)
 {
 	memset(recieve_buffer, 0, sizeof(recieve_buffer));
 
-	if (RC_FAIL(recieve_at_response(huart, recieve_buffer))) {
-		return -1;
+	if (RC_FAIL(recieve_at_response(huart, recieve_buffer, 1))) {
+		return UNKNOWN_CMD;
 	}
 
 	// ESP response format: +IPD,<size>:<message>
