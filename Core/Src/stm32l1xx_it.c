@@ -58,6 +58,7 @@ extern void Uart_isr (UART_HandleTypeDef *huart);
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern TIM_HandleTypeDef htim9;
 extern TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN EV */
@@ -159,6 +160,20 @@ void DebugMon_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32l1xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles TIM9 global interrupt.
+  */
+void TIM9_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM9_IRQn 0 */
+
+  /* USER CODE END TIM9_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim9);
+  /* USER CODE BEGIN TIM9_IRQn 1 */
+  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_SET);
+  /* USER CODE END TIM9_IRQn 1 */
+}
 
 /**
   * @brief This function handles TIM2 global interrupt.

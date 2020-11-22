@@ -68,6 +68,8 @@ void Error_Handler(void);
 #define pin_3_GPIO_Port GPIOB
 #define pin_row_Pin GPIO_PIN_14
 #define pin_row_GPIO_Port GPIOB
+#define inter_time_Pin GPIO_PIN_5
+#define inter_time_GPIO_Port GPIOB
 #define blue_led_Pin GPIO_PIN_6
 #define blue_led_GPIO_Port GPIOB
 #define green_led_Pin GPIO_PIN_7
