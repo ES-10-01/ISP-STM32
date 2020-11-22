@@ -25,7 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "wifi.h"
-#include "task.h"
+#include "utils.h"
 #include <string.h>
 //#include "UartRingbuffer_multi.h"
 /* USER CODE END Includes */
@@ -60,7 +60,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t init_taskHandle;
 const osThreadAttr_t init_task_attributes = {
   .name = "init_task",
-  .priority = (osPriority_t) osPriorityRealtime7,
+  .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
 /* Definitions for close_state_tas */
@@ -107,8 +107,8 @@ void OpenTask(void *argument);
 /* USER CODE BEGIN 0 */
 
 const char network_name[] = "OnePlus";
-const char network_pasw[]="1234321";
-const char serv_ip[]="192.168.0.1";
+const char network_pasw[]="123454321";
+const char serv_ip[]="192.168.43.231";
 const char control_id[]="1";
 
 char read_keypad()
@@ -206,7 +206,10 @@ int main(void)
   open_taskHandle = osThreadNew(OpenTask, NULL, &open_task_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  vTaskSuspend(defaultTaskHandle);
+  vTaskSuspend(close_state_tasHandle);
+  vTaskSuspend(input_taskHandle);
+  vTaskSuspend(open_taskHandle);
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -278,25 +281,24 @@ static void MX_TIM9_Init(void)
 
   /* USER CODE END TIM9_Init 0 */
 
-  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
   /* USER CODE BEGIN TIM9_Init 1 */
 
   /* USER CODE END TIM9_Init 1 */
   htim9.Instance = TIM9;
-  htim9.Init.Prescaler = 0;
+  htim9.Init.Prescaler = 32000;
   htim9.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim9.Init.Period = 30000;
+  htim9.Init.Period = 20000;
   htim9.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim9.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim9) != HAL_OK)
   {
     Error_Handler();
   }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
-  sSlaveConfig.InputTrigger = TIM_TS_ITR0;
-  if (HAL_TIM_SlaveConfigSynchro(&htim9, &sSlaveConfig) != HAL_OK)
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim9, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -417,30 +419,49 @@ void InitTask(void *argument)
 {
   /* USER CODE BEGIN InitTask */
 	enum GosServerCommands serv_answer;
-	check_esp_available(&huart1);
-	init_esp(&huart1);
-	connect_to_network(&huart1, network_name, network_pasw);
-	connect_to_server(&huart1, serv_ip, 8888);
-	send_hello(&huart1, control_id);
+	if (RC_FAIL(check_esp_available(&huart1))) {
+		return;
+	}
+	osDelay(1000);
+	if (RC_FAIL(init_esp(&huart1))) {
+		return;
+	}
+	osDelay(3000);
+	if (RC_FAIL(connect_to_network(&huart1, network_name, network_pasw))) {
+		return;
+	}
+	osDelay(5000);
+	if (RC_FAIL(connect_to_server(&huart1, serv_ip, 8888))) {
+		return;
+	}
+	osDelay(2500);
+	if (RC_FAIL(send_hello(&huart1, control_id))) {
+		return;
+	}
+	osDelay(2000);
 
-	xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
+	vTaskResume(close_state_tasHandle);
 
   /* Infinite loop */
   for(;;)
   {
 	  serv_answer = recieve_command(&huart1);// ожидание сообщения от сервера
 	  if (serv_answer == GOS_CLOSE_CMD){
-		 xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
+		 vTaskResume(close_state_tasHandle);
 		 serv_answer = UNKNOWN_CMD;
 	  }
 	  else if (serv_answer == GOS_GET_CMD) {
-		 xTaskNotify(input_taskHandle, (1<<0), eSetValueWithOverwrite);
+		 vTaskResume(input_taskHandle);
 		 serv_answer = UNKNOWN_CMD;
+		 vTaskSuspend(NULL);
 	  }
 	  else if (serv_answer == GOS_OPEN_CMD){
-		 xTaskNotify(open_taskHandle, (1<<0), eSetValueWithOverwrite);
+		 vTaskSuspend(close_state_tasHandle);
+		 vTaskSuspend(input_taskHandle);
+		 vTaskResume(open_taskHandle);
 		 serv_answer = UNKNOWN_CMD;
 	  }
+
   }
   /* USER CODE END InitTask */
 }
@@ -455,16 +476,11 @@ void InitTask(void *argument)
 void CloseStateTask(void *argument)
 {
   /* USER CODE BEGIN CloseStateTask */
-  uint32_t ulNotifiedValue;
   /* Infinite loop */
   for(;;)
   {
-	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
-		//очистить экран
-		//Подключить экран и вывести на экран close
-	}
-
     osDelay(1);
+    vTaskSuspend(NULL);
   }
   /* USER CODE END CloseStateTask */
 }
@@ -479,39 +495,42 @@ void CloseStateTask(void *argument)
 void InputTask(void *argument)
 {
   /* USER CODE BEGIN InputTask */
-  uint32_t ulNotifiedValue;
-  if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
-  HAL_TIM_Base_Start(&htim9);
-  int i = 0;
-  char pin[4];
-  GPIO_PinState wait = GPIO_PIN_RESET;
-
   /* Infinite loop */
+  for (;;) {
+		  HAL_TIM_Base_Start_IT(&htim9);
+		  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_RESET);
+		  int i = 0;
+		  char pin[5];
+		  pin[4] = '\0';
+		  GPIO_PinState wait = GPIO_PIN_RESET;
 
-	  //очистить экран
-	  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
-	  //вывести на экран PIN:
-	  while (i < 4 && (wait == GPIO_PIN_RESET)){
-	  wait = HAL_GPIO_ReadPin(GPIOB, inter_time_Pin);
-	  char a = read_keypad();
-	  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
-		 pin[i] = a;
-		 a = '0';
-		 //введеную цифру на экран
-		 i++;
-	  }
-	  }
-	  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
-	  //по таймауту 30 секунд
-	  if(wait == GPIO_PIN_RESET){
-		  send_password(&huart1, pin); //отправить GOS_PASS=pin
-	  }
-	  HAL_TIM_Base_Stop_IT(&htim9);
-	  __HAL_TIM_SET_COUNTER(&htim9, 0x0000);
-	  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_RESET);
-	  //остановить и сбросить таймер
-	  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
 
+
+		  //очистить экран
+		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
+		  //вывести на экран PIN:
+		  while (i < 4 && (wait == GPIO_PIN_RESET)){
+			  wait = HAL_GPIO_ReadPin(GPIOB, inter_time_Pin);
+			  char a = read_keypad();
+			  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
+				  pin[i] = a;
+				  a = '0';
+				  //введеную цифру на экран
+				  i++;
+			  }
+		  }
+		  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
+		  //по таймауту 30 секунд
+		  if(wait == GPIO_PIN_RESET){
+			  send_password(&huart1, pin); //отправить GOS_PASS=pin
+		  }
+		  vTaskResume(init_taskHandle);
+		  HAL_TIM_Base_Stop_IT(&htim9);
+		  __HAL_TIM_SET_COUNTER(&htim9, 0x0000);
+		  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_RESET);
+		  //остановить и сбросить таймер
+		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
+		  vTaskSuspend(NULL);
   }
   /* USER CODE END InputTask */
 }
@@ -526,18 +545,16 @@ void InputTask(void *argument)
 void OpenTask(void *argument)
 {
   /* USER CODE BEGIN OpenTask */
-  uint32_t ulNotifiedValue;
   /* Infinite loop */
   for(;;)
   {
-	if (xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) == pdTRUE){
 		//затаереть экран и вывести OPEN
 		HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_SET);
 		//timeout 10 секунд
 		osDelay(10000);
 		HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_RESET);
-		xTaskNotify(close_state_tasHandle, (1<<0), eSetValueWithOverwrite);
-	}
+		vTaskResume(close_state_tasHandle);
+		vTaskSuspend(NULL);
   }
   /* USER CODE END OpenTask */
 }

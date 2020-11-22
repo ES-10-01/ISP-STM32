@@ -172,6 +172,7 @@ void TIM9_IRQHandler(void)
   HAL_TIM_IRQHandler(&htim9);
   /* USER CODE BEGIN TIM9_IRQn 1 */
   HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_SET);
+  __HAL_TIM_SET_COUNTER(&htim9, 0x0000);
   /* USER CODE END TIM9_IRQn 1 */
 }
 
