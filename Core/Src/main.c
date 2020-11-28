@@ -26,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "wifi.h"
 #include "utils.h"
+#include "lcd16x2_i2c.h"
 #include <string.h>
 //#include "UartRingbuffer_multi.h"
 /* USER CODE END Includes */
@@ -45,6 +46,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 TIM_HandleTypeDef htim9;
 
 UART_HandleTypeDef huart1;
@@ -93,6 +96,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM9_Init(void);
+static void MX_I2C1_Init(void);
 void StartDefaultTask(void *argument);
 void InitTask(void *argument);
 void CloseStateTask(void *argument);
@@ -166,8 +170,9 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_TIM9_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-
+  lcd16x2_i2c_init(&hi2c1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -214,7 +219,7 @@ int main(void)
 
   /* Start scheduler */
   osKernelStart();
- 
+
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -238,10 +243,10 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage 
+  /** Configure the main internal regulator output voltage
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -254,7 +259,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -267,6 +272,40 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
@@ -405,7 +444,7 @@ void StartDefaultTask(void *argument)
   {
     osDelay(1);
   }
-  /* USER CODE END 5 */ 
+  /* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_InitTask */
@@ -422,19 +461,42 @@ void InitTask(void *argument)
 	if (RC_FAIL(check_esp_available(&huart1))) {
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("ESP OK");
 	osDelay(1000);
 	if (RC_FAIL(init_esp(&huart1))) {
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("ESP READY");
+
 	osDelay(3000);
+
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("NETWORK CONNECT");
 	if (RC_FAIL(connect_to_network(&huart1, network_name, network_pasw))) {
+		lcd16x2_i2c_clear();
+		lcd16x2_i2c_printf("CONNECTION FAIL");
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("CONNECTED");
+
 	osDelay(5000);
+
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("SERVER CONNECT");
 	if (RC_FAIL(connect_to_server(&huart1, serv_ip, 8888))) {
+		lcd16x2_i2c_clear();
+		lcd16x2_i2c_printf("CONNECTION FAIL");
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("CONNECTED");
+
 	osDelay(2500);
+
+	lcd16x2_i2c_clear();
 	if (RC_FAIL(send_hello(&huart1, control_id))) {
 		return;
 	}
@@ -479,6 +541,8 @@ void CloseStateTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("Close");
     osDelay(1);
     vTaskSuspend(NULL);
   }
@@ -501,26 +565,31 @@ void InputTask(void *argument)
 		  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_RESET);
 		  int i = 0;
 		  char pin[5];
+		  char pin_print[10] = "PIN: ";
 		  pin[4] = '\0';
 		  GPIO_PinState wait = GPIO_PIN_RESET;
 
 
 
-		  //очистить экран
+		  lcd16x2_i2c_clear();//очистить экран
+
 		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_SET);
-		  //вывести на экран PIN:
+		  lcd16x2_i2c_printf("PIN:");//вывести на экран PIN:
 		  while (i < 4 && (wait == GPIO_PIN_RESET)){
 			  wait = HAL_GPIO_ReadPin(GPIOB, inter_time_Pin);
 			  char a = read_keypad();
 			  if (a =='1' || a =='2' || a =='3' || a =='4') {		//проверка на таймают ?
 				  pin[i] = a;
+				  pin_print[i+5] = a;
 				  a = '0';
-				  //введеную цифру на экран
+				  lcd16x2_i2c_clear();
+				  lcd16x2_i2c_printf(pin_print);//введеную цифру на экран
 				  i++;
 			  }
 		  }
-		  //вместо таски на ожидание ввода добавить переход в стостяние закрыто
-		  //по таймауту 30 секунд
+
+		  strcpy(pin_print, "PIN: ");
+
 		  if(wait == GPIO_PIN_RESET){
 			  send_password(&huart1, pin); //отправить GOS_PASS=pin
 		  }
@@ -528,8 +597,9 @@ void InputTask(void *argument)
 		  HAL_TIM_Base_Stop_IT(&htim9);
 		  __HAL_TIM_SET_COUNTER(&htim9, 0x0000);
 		  HAL_GPIO_WritePin(GPIOB, inter_time_Pin, GPIO_PIN_RESET);
-		  //остановить и сбросить таймер
+
 		  HAL_GPIO_WritePin(GPIOB, blue_led_Pin, GPIO_PIN_RESET);
+		  lcd16x2_i2c_clear();
 		  vTaskSuspend(NULL);
   }
   /* USER CODE END InputTask */
@@ -548,9 +618,12 @@ void OpenTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-		//затаереть экран и вывести OPEN
+
+	  	lcd16x2_i2c_clear();
+	    lcd16x2_i2c_printf("Open");
+
 		HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_SET);
-		//timeout 10 секунд
+
 		osDelay(10000);
 		HAL_GPIO_WritePin(GPIOB, green_led_Pin, GPIO_PIN_RESET);
 		vTaskResume(close_state_tasHandle);
@@ -601,7 +674,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
