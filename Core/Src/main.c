@@ -461,19 +461,42 @@ void InitTask(void *argument)
 	if (RC_FAIL(check_esp_available(&huart1))) {
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("ESP OK");
 	osDelay(1000);
 	if (RC_FAIL(init_esp(&huart1))) {
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("ESP READY");
+
 	osDelay(3000);
+
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("NETWORK CONNECT");
 	if (RC_FAIL(connect_to_network(&huart1, network_name, network_pasw))) {
+		lcd16x2_i2c_clear();
+		lcd16x2_i2c_printf("CONNECTION FAIL");
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("CONNECTED");
+
 	osDelay(5000);
+
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("SERVER CONNECT");
 	if (RC_FAIL(connect_to_server(&huart1, serv_ip, 8888))) {
+		lcd16x2_i2c_clear();
+		lcd16x2_i2c_printf("CONNECTION FAIL");
 		return;
 	}
+	lcd16x2_i2c_clear();
+	lcd16x2_i2c_printf("CONNECTED");
+
 	osDelay(2500);
+
+	lcd16x2_i2c_clear();
 	if (RC_FAIL(send_hello(&huart1, control_id))) {
 		return;
 	}
@@ -565,7 +588,7 @@ void InputTask(void *argument)
 			  }
 		  }
 
-		  pin_print = "PIN: ";
+		  strcpy(pin_print, "PIN: ");
 
 		  if(wait == GPIO_PIN_RESET){
 			  send_password(&huart1, pin); //отправить GOS_PASS=pin
