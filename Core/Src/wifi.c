@@ -29,6 +29,7 @@ uint8_t * AT_CMD_END = (uint8_t *)"\r\n";
 
 uint8_t * GOS_HELLO = (uint8_t *)"GOS_HELLO=%s,%s";		// GOS_HELLO=<address>,<id>
 uint8_t * GOS_PASSWORD = (uint8_t *)"GOS_PASS=%s";	// GOS_PASSWORD=<pin password>
+uint8_t * GOS_LOCKED = (uint8_t *)"GOS_LOCKED";
 
 uint8_t * GOS_OPEN = (uint8_t *)"GOS_OPEN";
 uint8_t * GOS_CLOSE = (uint8_t *)"GOS_CLOSE";
@@ -161,7 +162,7 @@ uint8_t send_message(uart_ptr huart, const char * message)
 	memset(tmp_command_buffer, 0, sizeof(tmp_command_buffer));
 	memset(recieve_buffer, 0, sizeof(recieve_buffer));
 
-	if (RC_FAIL(sprintf(tmp_command_buffer, AT_TCP_SEND, strlen(message)))) {
+	if (RC_FAIL(sprintf(tmp_command_buffer, AT_TCP_SEND, strlen(message)+2))) {
 		return -1;
 	}
 
@@ -177,7 +178,7 @@ uint8_t send_message(uart_ptr huart, const char * message)
 		return -1;
 	}
 
-	if (RC_FAIL(send(huart, message))) {
+	if (RC_FAIL(send_at_command(huart, message))) {
 		return -1;
 	}
 
@@ -232,6 +233,15 @@ int8_t send_password(uart_ptr huart, const char * password)
 	}
 
 	if (RC_FAIL(send_message(huart, tmp_message_buffer))) {
+		return -1;
+	}
+
+	return 0;
+}
+
+int8_t send_locked(uart_ptr huart)
+{
+	if (RC_FAIL(send_message(huart, GOS_LOCKED))) {
 		return -1;
 	}
 

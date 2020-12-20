@@ -110,9 +110,9 @@ void OpenTask(void *argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-const char network_name[] = "OnePlus";
-const char network_pasw[]="123454321";
-const char serv_ip[]="192.168.43.231";
+const char network_name[] = "Mars aliens";
+const char network_pasw[]="Zhjcnysqv`l900";
+const char serv_ip[]="188.242.89.179";
 const char control_id[]="1";
 
 char read_keypad()
@@ -486,7 +486,7 @@ void InitTask(void *argument)
 
 	lcd16x2_i2c_clear();
 	lcd16x2_i2c_printf("SERVER CONNECT");
-	if (RC_FAIL(connect_to_server(&huart1, serv_ip, 8888))) {
+	if (RC_FAIL(connect_to_server(&huart1, serv_ip, 9876))) {
 		lcd16x2_i2c_clear();
 		lcd16x2_i2c_printf("CONNECTION FAIL");
 		return;
@@ -522,6 +522,7 @@ void InitTask(void *argument)
 		 vTaskSuspend(input_taskHandle);
 		 vTaskResume(open_taskHandle);
 		 serv_answer = UNKNOWN_CMD;
+		 vTaskSuspend(NULL);
 	  }
 
   }
@@ -543,7 +544,10 @@ void CloseStateTask(void *argument)
   {
 	lcd16x2_i2c_clear();
 	lcd16x2_i2c_printf("Close");
+	send_locked(&huart1);
     osDelay(1);
+
+	vTaskResume(init_taskHandle);
     vTaskSuspend(NULL);
   }
   /* USER CODE END CloseStateTask */
