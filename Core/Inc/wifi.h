@@ -35,6 +35,7 @@ int8_t connect_to_server(uart_ptr huart, const char * address, uint16_t port);
 
 int8_t send_hello(uart_ptr huart, const char * id);
 int8_t send_password(uart_ptr huart, const char * password);
+int8_t send_locked(uart_ptr huart);
 
 enum GosServerCommands recieve_command(uart_ptr huart);
 
